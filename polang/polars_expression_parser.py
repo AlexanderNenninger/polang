@@ -1,23 +1,39 @@
+import imp
 from abc import ABC, abstractmethod
+from multiprocessing.spawn import import_main_path
 from operator import add, methodcaller, mul, neg, sub, truediv
 
 from polars import Expr, col
-from pyparsing import (ParserElement, Word, alphas, infix_notation, one_of,
-                       opAssoc)
+from pyparsing import (
+    ParserElement,
+    QuotedString,
+    Word,
+    alphas,
+    identchars,
+    infix_notation,
+    one_of,
+    opAssoc,
+)
+from pyparsing import pyparsing_common as ppc
 
 
 class Operand:
     def __init__(self, tokens):
-        self.name = tokens[0]
+        try:
+            self.value = float(tokens[0])
+        except ValueError:
+            self.value = tokens[0]
 
     def __str__(self):
-        return str(self.name)
+        return str(self.value)
 
     def __repr__(self) -> str:
-        return f"Operand({self.name})"
+        return f"Operand({self.value})"
 
     def eval(self):
-        return col(self.name)
+        if isinstance(self.value, float):
+            return self.value
+        return col(self.value)
 
 
 class Operator(ABC):
@@ -86,7 +102,7 @@ class Function(Operator):
 
 
 def make_polang() -> ParserElement:
-    operand = Word(alphas).setParseAction(Operand)
+    operand = (Word(identchars) | ppc.number).setParseAction(Operand)
 
     return infix_notation(
         operand,
