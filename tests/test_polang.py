@@ -21,7 +21,7 @@ class TestPolang(TestCase):
     def test_parser(self):
         exprs = polang("sum(a - b)")
         df = self.df.select(exprs)
-        assert (df - (self.df.a - self.df.b).sum())[0, 0] < self.eps
+        self.assertAlmostEqual(df[0, 0], (self.df.a - self.df.b).sum())
 
         exprs = polang("a - b")
         df = self.df.select(exprs)
@@ -35,4 +35,9 @@ class TestPolang(TestCase):
         exprs = polang("2.1 * a - 3")
         df = self.df.select(exprs)
         assert df.a[0] == 2.1 * self.df.a[0] - 3
-        pass
+
+    def test_alias(self):
+        expr = polang("alias(a, 'test')")
+        assert str(expr) == 'col("a").alias("test")'
+        df = self.df.select(expr)
+        assert df.columns[0] == "test"

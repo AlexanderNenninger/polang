@@ -1,6 +1,10 @@
 # Polang
 
-*Polang* is a super simple arithmetic parser that compiles to [Polars Expressions](https://pola-rs.github.io/polars/py-polars/html/reference/api/polars.Expr.html#polars.Expr). 
+*Polang* is a simple arithmetic parser that compiles to [Polars Expressions](https://pola-rs.github.io/polars/py-polars/html/reference/api/polars.Expr.html#polars.Expr).
+
+## But Why?
+
+My usecase is tabular data with a lot of columns that need transformation. 
 
 ## Usage
 

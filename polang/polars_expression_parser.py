@@ -1,39 +1,54 @@
-import imp
 from abc import ABC, abstractmethod
-from multiprocessing.spawn import import_main_path
 from operator import add, methodcaller, mul, neg, sub, truediv
 
 from polars import Expr, col
 from pyparsing import (
+    Forward,
+    Optional,
     ParserElement,
     QuotedString,
+    Suppress,
     Word,
     alphas,
+    delimited_list,
+    identbodychars,
     identchars,
     infix_notation,
     one_of,
     opAssoc,
+    printables,
 )
 from pyparsing import pyparsing_common as ppc
 
 
 class Operand:
-    def __init__(self, tokens):
-        try:
-            self.value = float(tokens[0])
-        except ValueError:
-            self.value = tokens[0]
+    def __init__(self, tokens) -> None:
+        self.value = tokens[0]
 
-    def __str__(self):
+    @abstractmethod
+    def eval(self) -> Expr | str | float:
+        pass
+
+    def __str__(self) -> str:
         return str(self.value)
 
     def __repr__(self) -> str:
-        return f"Operand({self.value})"
+        return f"{self.__class__.__name__}({self.value})"
 
-    def eval(self):
-        if isinstance(self.value, float):
-            return self.value
+
+class Column(Operand):
+    def eval(self) -> Expr:
         return col(self.value)
+
+
+class Floatingpoint(Operand):
+    def eval(self) -> float:
+        return float(self.value)
+
+
+class String(Operand):
+    def eval(self):
+        return self.value
 
 
 class Operator(ABC):
@@ -77,7 +92,7 @@ class PrefixOperator(Operator):
     def __init__(self, tokens):
         super().__init__(tokens)
         self.fst = tokens[0][1]
-        match tokens[0][0]:
+        match tokens[0]:
             case "-":
                 self.func = neg
             case "+":
@@ -92,31 +107,59 @@ class PrefixOperator(Operator):
 class Function(Operator):
     def __init__(self, tokens):
         super().__init__(tokens)
-        self.args = tokens[0][1:]
-        match tokens[0][0]:
-            case _:
-                self.func = methodcaller(tokens[0][0])
+        match tokens:
+            case [fname]:
+                self.func = eval(fname)
+                self.arg = None
+            case [fname, arg]:
+                self.func = methodcaller(fname)
+                self.arg = arg
+            case [fname, arg, *args]:
+                self.func = methodcaller(fname, *[arg.eval() for arg in args])
+                self.arg = arg
 
     def eval(self):
-        return self.func(*[arg.eval() for arg in self.args])
+        if self.arg is None:
+            return self.func()
+        return self.func(self.arg.eval())
 
 
 def make_polang() -> ParserElement:
-    operand = (Word(identchars) | ppc.number).setParseAction(Operand)
 
-    return infix_notation(
+    parse_tree = Forward()
+    # Function calls
+
+    function_name = Word(identchars, identbodychars)
+    function_body = Forward()
+    function_body <<= (
+        function_name
+        + Suppress("(")
+        + Optional(delimited_list(parse_tree))
+        + Suppress(")")
+    ).set_parse_action(Function)
+
+    # Calculations
+    operand = (
+        ppc.number.set_parse_action(Floatingpoint)
+        | QuotedString("'").set_parse_action(String)
+        | Word(alphas).set_parse_action(Column)
+    )
+
+    parse_tree <<= function_body | infix_notation(
         operand,
         [
-            (one_of(["sin", "cos", "sum", "mean"]), 1, opAssoc.RIGHT, Function),
             (one_of("+ -"), 1, opAssoc.RIGHT, PrefixOperator),
             (one_of("* /"), 2, opAssoc.LEFT, InfixOperator),
             (one_of("+ -"), 2, opAssoc.LEFT, InfixOperator),
         ],
     )
 
+    return parse_tree
+
 
 def polang(s: str) -> Expr:
-    return make_polang().parseString(s)[0].eval()
+    parsed = make_polang().parseString(s)[0]
+    return parsed.eval()
 
 
 if __name__ == "__main__":
