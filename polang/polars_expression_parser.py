@@ -109,8 +109,7 @@ class Function(Operator):
         super().__init__(tokens)
         match tokens:
             case [fname]:
-                self.func = eval(fname)
-                self.arg = None
+                raise ValueError("Zero argument functions are not supported.")
             case [fname, arg]:
                 self.func = methodcaller(fname)
                 self.arg = arg
