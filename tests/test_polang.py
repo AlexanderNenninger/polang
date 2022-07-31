@@ -47,12 +47,12 @@ class TestPolang(TestCase):
     def test_shift_by_1(self):
         # Custom functions and function calls inside parentheses
         expr = polang("(2 * shift(b, 1))")
-        df = self.df.select(expr.alias("db/da"))
+        self.df.select(expr.alias("db/da"))
 
     def test_shift_by_neg_1(self):
         # Custom functions and function calls inside parentheses
         expr = polang("shift(b, -1)")
-        df = self.df.select(expr.alias("db/da"))
+        self.df.select(expr.alias("db/da"))
 
     def test_derivative(self):
         expr = polang("(shift(b, 1) - shift(b, -1)) / (shift(a,1) - shift(a,-1))")

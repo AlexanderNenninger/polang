@@ -39,4 +39,4 @@ jobs:
         mypy --ignore-missing-imports .
     - name: Test with unittest
       run: |
-        unittest
+        python -m unittest tests/test_*.py
