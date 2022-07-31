@@ -1,5 +1,6 @@
 from abc import ABC, abstractclassmethod, abstractmethod
 from operator import add, methodcaller, mul, neg, sub, truediv
+from urllib.parse import ParseResult
 
 from polars import Expr, col
 from pyparsing import (
@@ -20,7 +21,7 @@ from pyparsing import pyparsing_common as ppc
 
 
 class Operand:
-    def __init__(self, tokens) -> None:
+    def __init__(self, tokens: ParseResult) -> None:
         self.value = tokens[0]
 
     @abstractmethod
@@ -48,7 +49,7 @@ class Column(Operand):
 
 
 class Integer(Operand):
-    def eval(self) -> Expr:
+    def eval(self) -> int:
         return int(self.value)
 
     @classmethod
