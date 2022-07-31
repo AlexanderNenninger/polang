@@ -1,22 +1,21 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractclassmethod, abstractmethod
 from operator import add, methodcaller, mul, neg, sub, truediv
 
 from polars import Expr, col
 from pyparsing import (
+    FollowedBy,
     Forward,
     Optional,
     ParserElement,
     QuotedString,
     Suppress,
     Word,
-    alphas,
     delimited_list,
     identbodychars,
     identchars,
     infix_notation,
     one_of,
     opAssoc,
-    printables,
 )
 from pyparsing import pyparsing_common as ppc
 
@@ -26,7 +25,11 @@ class Operand:
         self.value = tokens[0]
 
     @abstractmethod
-    def eval(self) -> Expr | str | float:
+    def eval(self) -> Expr | str | float | int:
+        pass
+
+    @abstractclassmethod
+    def parser(cls) -> ParserElement:
         pass
 
     def __str__(self) -> str:
@@ -40,15 +43,36 @@ class Column(Operand):
     def eval(self) -> Expr:
         return col(self.value)
 
+    @classmethod
+    def parser(cls):
+        return Word(identchars, identbodychars).set_parse_action(cls)
+
+
+class Integer(Operand):
+    def eval(self) -> Expr:
+        return int(self.value)
+
+    @classmethod
+    def parser(cls):
+        return (ppc.integer + ~FollowedBy(".")).set_parse_action(cls)
+
 
 class Floatingpoint(Operand):
     def eval(self) -> float:
         return float(self.value)
 
+    @classmethod
+    def parser(cls):
+        return ppc.fnumber.set_parse_action(cls)
+
 
 class String(Operand):
     def eval(self):
         return self.value
+
+    @classmethod
+    def parser(cls):
+        return QuotedString(quoteChar="'").set_parse_action(cls)
 
 
 class Operator(ABC):
@@ -92,13 +116,13 @@ class PrefixOperator(Operator):
     def __init__(self, tokens):
         super().__init__(tokens)
         self.fst = tokens[0][1]
-        match tokens[0]:
+        match tokens[0][0]:
             case "-":
                 self.func = neg
             case "+":
                 self.func = lambda x: x
             case _:
-                raise ValueError(f"Unknown prefix operator {tokens[0][1]}")
+                raise ValueError(f"Unknown prefix operator {tokens[0][0]}")
 
     def eval(self):
         return self.func(self.fst.eval())
@@ -135,16 +159,18 @@ def make_polang() -> ParserElement:
         + Suppress("(")
         + Optional(delimited_list(parse_tree))
         + Suppress(")")
-    ).set_parse_action(Function)
+    )
 
     # Calculations
     operand = (
-        ppc.number.set_parse_action(Floatingpoint)
-        | QuotedString("'").set_parse_action(String)
-        | Word(alphas).set_parse_action(Column)
+        Integer.parser()
+        | Floatingpoint.parser()
+        | String.parser()
+        | function_body.set_parse_action(Function)
+        | Column.parser().set_parse_action(Column)
     )
 
-    parse_tree <<= function_body | infix_notation(
+    parse_tree <<= infix_notation(
         operand,
         [
             (one_of("+ -"), 1, opAssoc.RIGHT, PrefixOperator),
