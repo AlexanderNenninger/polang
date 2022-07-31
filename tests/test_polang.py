@@ -57,4 +57,4 @@ class TestPolang(TestCase):
     def test_derivative(self):
         expr = polang("(shift(b, 1) - shift(b, -1)) / (shift(a,1) - shift(a,-1))")
         df = self.df.select(expr.alias("db/da"))
-        pass
+        self.assertTrue(df[1, 0] - self.df.c[1] < 1e-4)

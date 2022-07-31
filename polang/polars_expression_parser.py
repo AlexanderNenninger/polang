@@ -5,7 +5,6 @@ from polars import Expr, col
 from pyparsing import (
     FollowedBy,
     Forward,
-    Optional,
     ParserElement,
     QuotedString,
     Suppress,
@@ -157,7 +156,7 @@ def make_polang() -> ParserElement:
     function_body <<= (
         function_name
         + Suppress("(")
-        + Optional(delimited_list(parse_tree))
+        + delimited_list(parse_tree, min=1)
         + Suppress(")")
     )
 
