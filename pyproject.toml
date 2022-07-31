@@ -1,0 +1,21 @@
+[project]
+name = "polang"
+version = "0.1.0"
+authors = [{ name = "Alexander Nenninger", email = "alex.ne.dev@outlook.com" }]
+description = "Polang is a simple calulator language for polars data frames."
+readme = "Readme.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires = ["polars", "pyparsing"]
+
+[project.urls]
+"Homepage" = "https://github.com/AlexanderNenninger/polang"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
