@@ -1,5 +1,5 @@
 from abc import ABC, abstractclassmethod, abstractmethod
-from operator import add, methodcaller, mul, neg, sub, truediv
+from operator import add, mul, neg, sub, truediv
 from urllib.parse import ParseResult
 
 from polars import Expr, col
@@ -94,8 +94,7 @@ class Operator(ABC):
 class InfixOperator(Operator):
     def __init__(self, tokens):
         super().__init__(tokens)
-        self.fst = tokens[0][0]
-        self.snd = tokens[0][2]
+        self.children = [tokens[0][0], tokens[0][2]]
         match tokens[0][1]:
             case "*":
                 self.func = mul
@@ -109,13 +108,13 @@ class InfixOperator(Operator):
                 raise ValueError(f"Unknown infix operator {tokens[0][1]}")
 
     def eval(self):
-        return self.func(self.fst.eval(), self.snd.eval())
+        return self.func(*[c.eval() for c in self.children])
 
 
 class PrefixOperator(Operator):
     def __init__(self, tokens):
         super().__init__(tokens)
-        self.fst = tokens[0][1]
+        self.children = [tokens[0][1]]
         match tokens[0][0]:
             case "-":
                 self.func = neg
@@ -125,7 +124,14 @@ class PrefixOperator(Operator):
                 raise ValueError(f"Unknown prefix operator {tokens[0][0]}")
 
     def eval(self):
-        return self.func(self.fst.eval())
+        return self.func(*[c.eval() for c in self.children])
+
+
+def method2fun(fname):
+    def call(*args):
+        return getattr(args[0], fname)(*args[1:])
+
+    return call
 
 
 class Function(Operator):
@@ -134,17 +140,12 @@ class Function(Operator):
         match tokens:
             case [fname]:
                 raise ValueError("Zero argument functions are not supported.")
-            case [fname, arg]:
-                self.func = methodcaller(fname)
-                self.arg = arg
-            case [fname, arg, *args]:
-                self.func = methodcaller(fname, *[arg.eval() for arg in args])
-                self.arg = arg
+            case [fname, *args]:
+                self.func = method2fun(fname)
+                self.children = args
 
     def eval(self):
-        if self.arg is None:
-            return self.func()
-        return self.func(self.arg.eval())
+        return self.func(*[c.eval() for c in self.children])
 
 
 def make_polang() -> ParserElement:
