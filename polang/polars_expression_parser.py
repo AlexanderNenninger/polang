@@ -1,8 +1,9 @@
 from abc import ABC, abstractclassmethod, abstractmethod
 from operator import add, mul, neg, sub, truediv
+from typing import List
 from urllib.parse import ParseResult
 
-from polars import Expr, col
+from polars import DataFrame, Expr, col
 from pyparsing import (
     FollowedBy,
     Forward,
@@ -75,10 +76,20 @@ class String(Operand):
         return QuotedString(quoteChar="'").set_parse_action(cls)
 
 
+def raises_not_implemented(*args, **kwargs):
+    """Raises NotImplemented error when called.
+
+    Raises:
+        NotImplementedError: Always.
+    """
+    raise NotImplementedError()
+
+
 class Operator(ABC):
     def __init__(self, tokens):
         self.tokens = tokens
-        self.func = lambda x: x
+        self.func = raises_not_implemented
+        self.children = []
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}{self.func}({self.tokens})"
@@ -86,9 +97,8 @@ class Operator(ABC):
     def __call__(self, *args):
         return self.func(*args)
 
-    @abstractmethod
     def eval(self):
-        pass
+        return self.func(*[c.eval() for c in self.children])
 
 
 class InfixOperator(Operator):
@@ -107,9 +117,6 @@ class InfixOperator(Operator):
             case _:
                 raise ValueError(f"Unknown infix operator {tokens[0][1]}")
 
-    def eval(self):
-        return self.func(*[c.eval() for c in self.children])
-
 
 class PrefixOperator(Operator):
     def __init__(self, tokens):
@@ -122,9 +129,6 @@ class PrefixOperator(Operator):
                 self.func = lambda x: x
             case _:
                 raise ValueError(f"Unknown prefix operator {tokens[0][0]}")
-
-    def eval(self):
-        return self.func(*[c.eval() for c in self.children])
 
 
 def method2fun(fname):
@@ -143,9 +147,6 @@ class Function(Operator):
             case [fname, *args]:
                 self.func = method2fun(fname)
                 self.children = args
-
-    def eval(self):
-        return self.func(*[c.eval() for c in self.children])
 
 
 def make_polang() -> ParserElement:
@@ -183,9 +184,36 @@ def make_polang() -> ParserElement:
     return parse_tree
 
 
+def find_columns(node: Operator | Operand) -> List[str]:
+    """Find all column names used in an expression.
+
+    Args:
+        node (Operator | Operand): The root of the parse tree.
+
+    Returns:
+        List: A list of column names.
+    """
+
+    def dfs(node, columns):
+        if isinstance(node, Column):
+            columns.append(node.value)
+        if hasattr(node, "children"):
+            for child in node.children:
+                dfs(child, columns)
+
+    columns: List[str] = []
+    dfs(node, columns)
+    return columns
+
+
 def polang(s: str) -> Expr:
-    parsed = make_polang().parseString(s)[0]
-    return parsed.eval()
+    return make_polang().parseString(s)[0].eval()
+
+
+def can_select_polang(df: DataFrame, s: str) -> bool:
+    ast = make_polang().parseString(s)[0]
+    columns = find_columns(ast)
+    return set(columns).issubset(df.columns)
 
 
 if __name__ == "__main__":
